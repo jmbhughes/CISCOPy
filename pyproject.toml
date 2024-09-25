@@ -1,0 +1,78 @@
+[build-system]
+
+requires = ["setuptools",
+            "wheel"]
+
+[project]
+name = "ciiscopy"
+version = "0.0.1"
+dependencies = [ ]
+requires-python = ">=3.11"
+authors = [
+    {name = "J. Marcus Hughes", email = "marcus.hughes@swri.org"}
+]
+maintainers = [
+  {name = "J. Marcus Hughes", email = "marcus.hughes@swri.org"}
+]
+description = "CIISCO in Python"
+readme = "TODO"
+license = {file = "TODO"}
+keywords = ["TODO"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+
+[project.optional-dependencies]
+test = ["pytest",
+        "codespell",
+        "coverage",
+        "pytest-cov",
+        "pre-commit",
+        "ruff",
+        "hypothesis"]
+docs = ["sphinx",
+        "codespell",
+        "pydata-sphinx-theme",
+        "sphinx-autoapi",
+        "sphinx-favicon",
+        "nbsphinx",
+        "ipython",
+        "sphinxcontrib-mermaid"]
+dev = ["ciiscopy[docs,test]"]
+
+[project.urls]
+#Homepage = "https://example.com"
+#Documentation = "https://readthedocs.org"
+Repository = "https://github.com/punch-mission/punchbowl.git"
+"Bug Tracker" = "https://github.com/punch-mission/punchbowl/issues"
+#Changelog = "https://github.com/punch-mission/thuban/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages]
+find = {}  # Scan the project directory with the default parameters
+
+[tool.codespell]
+skip = "*.fts,*.fits,venv,*.pro,*.asdf,*.ipynb"
+
+[tool.ruff]
+target-version = 'py311'
+exclude = ['tests', 'scripts', 'docs']
+line-length=120
+lint.select = ["ALL"]
+lint.ignore = [ ]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+
+[tool.isort]
+balanced_wrapping = true
+default_section = "THIRDPARTY"
+include_trailing_comma = true
+known_compatibility = "future"
+known_first_party = "ciiscopy"
+length_sort = false
+length_sort_sections = "stdlib"
+line_length = 120
+multi_line_output = 3
+no_lines_before = "LOCALFOLDER"
+sections = "FUTURE, COMPATIBILITY, STDLIB, THIRDPARTY, FIRSTPARTY, LOCALFOLDER"
