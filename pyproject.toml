@@ -4,7 +4,7 @@ requires = ["setuptools",
             "wheel"]
 
 [project]
-name = "ciiscopy"
+name = "ciscopy"
 version = "0.0.1"
 dependencies = [ ]
 requires-python = ">=3.11"
@@ -14,7 +14,7 @@ authors = [
 maintainers = [
   {name = "J. Marcus Hughes", email = "marcus.hughes@swri.org"}
 ]
-description = "CIISCO in Python"
+description = "CIISCO in Python with generalizations to new data."
 readme = "TODO"
 license = {file = "TODO"}
 keywords = ["TODO"]
@@ -39,13 +39,13 @@ docs = ["sphinx",
         "nbsphinx",
         "ipython",
         "sphinxcontrib-mermaid"]
-dev = ["ciiscopy[docs,test]"]
+dev = ["ciscopy[docs,test]"]
 
 [project.urls]
 #Homepage = "https://example.com"
 #Documentation = "https://readthedocs.org"
-Repository = "https://github.com/punch-mission/punchbowl.git"
-"Bug Tracker" = "https://github.com/punch-mission/punchbowl/issues"
+Repository = "https://github.com/jmbhughes/CISCOPy"
+"Bug Tracker" = "https://github.com/jmbhughes/CISCOPy/issues"
 #Changelog = "https://github.com/punch-mission/thuban/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages]
@@ -69,7 +69,7 @@ balanced_wrapping = true
 default_section = "THIRDPARTY"
 include_trailing_comma = true
 known_compatibility = "future"
-known_first_party = "ciiscopy"
+known_first_party = "ciscopy"
 length_sort = false
 length_sort_sections = "stdlib"
 line_length = 120

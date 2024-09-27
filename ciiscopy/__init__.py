@@ -1,1 +1,0 @@
-"""ciiscopy: CIISCO in Python."""
