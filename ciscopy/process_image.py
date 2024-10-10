@@ -1,0 +1,2 @@
+### Enhance using WOW: https://github.com/sunpy/sunkit-image/blob/main/sunkit_image/enhance.py
+### Mask using https://docs.sunpy.org/en/stable/generated/gallery/computer_vision_techniques/mask_disk.html
