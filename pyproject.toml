@@ -6,7 +6,6 @@ requires = ["setuptools",
 [project]
 name = "ciscopy"
 version = "0.0.1"
-dependencies = [ ]
 requires-python = ">=3.11"
 authors = [
     {name = "J. Marcus Hughes", email = "marcus.hughes@swri.org"}
@@ -21,6 +20,10 @@ keywords = ["TODO"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python"
+]
+dependencies = [
+    "numpy",
+    "scipy"
 ]
 
 [project.optional-dependencies]
