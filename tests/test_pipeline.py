@@ -243,6 +243,8 @@ def test_extended_preset_aliases_resolve() -> None:
     assert get_instrument_preset("LASCO/C3").name == "lasco_c3"
     assert get_instrument_preset("STEREO COR1").name == "cor1"
     assert get_instrument_preset("STEREO/COR2").name == "cor2"
+    assert get_instrument_preset("Solar Orbiter FSI 174").name == "fsi174"
+    assert get_instrument_preset("Solar Orbiter FSI 304").name == "fsi304"
     assert get_instrument_preset("Solar Orbiter METIS").name == "metis"
     assert get_instrument_preset("GOES SUVI").name == "suvi"
     assert get_instrument_preset("MLSO K-Coronagraph").name == "kcor"
@@ -257,6 +259,16 @@ def test_extended_header_inference_covers_coronagraphs() -> None:
     cor2["INSTRUME"] = "SECCHI"
     cor2["DETECTOR"] = "COR2"
 
+    fsi174 = fits.Header()
+    fsi174["INSTRUME"] = "EUI"
+    fsi174["DETECTOR"] = "FSI"
+    fsi174["WAVELNTH"] = 174
+
+    fsi304 = fits.Header()
+    fsi304["INSTRUME"] = "EUI"
+    fsi304["DETECTOR"] = "FSI"
+    fsi304["WAVELNTH"] = 304
+
     metis = fits.Header()
     metis["TELESCOP"] = "METIS"
 
@@ -268,6 +280,8 @@ def test_extended_header_inference_covers_coronagraphs() -> None:
 
     assert infer_instrument_preset(lasco).name == "lasco_c2"
     assert infer_instrument_preset(cor2).name == "cor2"
+    assert infer_instrument_preset(fsi174).name == "fsi174"
+    assert infer_instrument_preset(fsi304).name == "fsi304"
     assert infer_instrument_preset(metis).name == "metis"
     assert infer_instrument_preset(suvi).name == "suvi"
     assert infer_instrument_preset(kcor).name == "kcor"

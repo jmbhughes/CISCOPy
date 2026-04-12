@@ -29,6 +29,8 @@ PRESETS: dict[str, InstrumentPreset] = {
     "generic": InstrumentPreset("generic"),
     "aia171": InstrumentPreset("aia171", radial_samples=256, threshold_sigma=3.5, min_area=45),
     "aia304": InstrumentPreset("aia304", radial_samples=256, threshold_sigma=3.0, min_area=40),
+    "fsi174": InstrumentPreset("fsi174", r_min_rsun=1.0, r_max_rsun=4.0, radial_samples=224, threshold_sigma=3.25, min_area=35),
+    "fsi304": InstrumentPreset("fsi304", r_min_rsun=1.0, r_max_rsun=4.0, radial_samples=224, threshold_sigma=3.0, min_area=35),
     "swap174": InstrumentPreset("swap174", radial_samples=192, threshold_sigma=3.25, min_area=35),
     "euvi304": InstrumentPreset("euvi304", radial_samples=192, threshold_sigma=3.0, min_area=35),
     "lasco_c2": InstrumentPreset("lasco_c2", r_min_rsun=2.0, r_max_rsun=6.0, radial_samples=256, threshold_sigma=3.5, min_area=45),
@@ -62,6 +64,18 @@ def get_instrument_preset(name: str | None) -> InstrumentPreset:
         "aia304": "aia304",
         "aia(304a)": "aia304",
         "aia304a": "aia304",
+        "fsi174": "fsi174",
+        "fsi(174a)": "fsi174",
+        "fsi174a": "fsi174",
+        "soloorbiterfsi174": "fsi174",
+        "solarorbiterfsi174": "fsi174",
+        "solar orbiter fsi 174": "fsi174",
+        "fsi304": "fsi304",
+        "fsi(304a)": "fsi304",
+        "fsi304a": "fsi304",
+        "soloorbiterfsi304": "fsi304",
+        "solarorbiterfsi304": "fsi304",
+        "solar orbiter fsi 304": "fsi304",
         "swap174": "swap174",
         "swap(174a)": "swap174",
         "swap174a": "swap174",
@@ -134,6 +148,10 @@ def infer_instrument_preset(header: Any | None) -> InstrumentPreset:
         return PRESETS["aia171"]
     if instrument == "AIA" and wavelength == "304":
         return PRESETS["aia304"]
+    if instrument == "EUI" and detector == "FSI" and wavelength == "174":
+        return PRESETS["fsi174"]
+    if instrument == "EUI" and detector == "FSI" and wavelength == "304":
+        return PRESETS["fsi304"]
     if instrument == "SWAP":
         return PRESETS["swap174"]
     if instrument.startswith("EUVI") and wavelength == "304":

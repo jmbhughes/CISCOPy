@@ -70,6 +70,7 @@ Available utilities:
 Preset support includes:
 
 - `AIA` 171 and 304 A
+- `Solar Orbiter FSI` 174 and 304 A
 - `SWAP` 174 A
 - `EUVI` 304 A
 - `LASCO` C2 and C3
@@ -80,6 +81,9 @@ Preset support includes:
 
 Unknown instruments still work through the generic path as long as the data can
 be represented with image arrays plus reasonable FITS headers and/or WCS.
+For instruments like Solar Orbiter FSI, where the apparent solar size changes
+with spacecraft distance, the preset stays in solar-radii units and the actual
+pixel-space radial bounds are computed from the image metadata at runtime.
 
 ## End-to-End Example
 
