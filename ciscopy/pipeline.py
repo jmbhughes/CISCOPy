@@ -35,7 +35,8 @@ class CISCO:
         ----------
         data
             FITS paths, a 2D image, a 3D image cube, an `NDCube`, or a list of
-            `NDCube` objects.
+            `NDCube` objects. CME characterization requires at least 3
+            time-ordered images.
         header, wcs, meta, unit, time
             Optional metadata used when `data` is provided as arrays rather than
             FITS files or `NDCube` objects.
@@ -72,7 +73,8 @@ class CISCO:
         -------
         tuple
             A pair containing the output Astropy table and the intermediate
-            processed data products.
+            processed data products. A `ValueError` is raised when fewer than 3
+            frames are available.
         """
 
         candidates, processed = characterize_cmes(

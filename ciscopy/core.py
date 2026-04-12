@@ -80,6 +80,7 @@ def main(
     data
         Input solar sequence. Supported values are FITS path lists, a 2D image,
         a 3D image cube, an `ndcube.NDCube`, or a list of `NDCube` objects.
+        CME characterization requires at least 3 time-ordered images.
     header
         FITS header or per-frame FITS headers associated with array inputs.
     wcs

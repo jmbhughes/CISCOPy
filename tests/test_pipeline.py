@@ -294,3 +294,26 @@ def test_main_accepts_explicit_preset(tmp_path) -> None:
 
     assert output_path.exists()
     assert len(result.table) >= 1
+
+
+def test_main_rejects_single_image_input_for_kinematics() -> None:
+    image = np.ones((64, 64), dtype=float)
+    header = fits.Header()
+    header["CRPIX1"] = 33
+    header["CRPIX2"] = 33
+    header["CDELT1"] = 20.0
+    header["RSUN_OBS"] = 320.0
+    header["RSUN_REF"] = 695700000.0
+    header["DATE-OBS"] = "2024-01-01T00:00:00"
+
+    with pytest.raises(ValueError, match="at least 3 time-ordered images"):
+        main(image, header=header)
+
+
+def test_pipeline_rejects_two_frame_sequence_for_kinematics() -> None:
+    cube = np.ones((2, 64, 64), dtype=float)
+    headers = _synthetic_headers(2, shape=(64, 64))
+    pipeline = CISCO.from_input(cube, header=headers)
+
+    with pytest.raises(ValueError, match="at least 3 time-ordered images"):
+        pipeline.characterize()

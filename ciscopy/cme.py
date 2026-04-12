@@ -94,6 +94,17 @@ def _build_uniform_background(sequence: SolarSequence, min_background: np.ndarra
     return uniform_background(min_background.shape, profile, header=sequence[0].header)
 
 
+def _validate_sequence_for_kinematics(sequence: SolarSequence) -> None:
+    """Ensure the sequence contains enough frames for CME kinematics."""
+
+    if len(sequence) < 3:
+        msg = (
+            "CME characterization requires at least 3 time-ordered images. "
+            "Single-image or two-image inputs cannot provide reliable speed and acceleration."
+        )
+        raise ValueError(msg)
+
+
 def preprocess_sequence(
     sequence: SolarSequence,
     *,
@@ -497,6 +508,7 @@ def characterize_cmes(
         Detected CME candidates and the associated intermediate products.
     """
 
+    _validate_sequence_for_kinematics(sequence)
     processed = preprocess_sequence(
         sequence,
         preset=preset,
