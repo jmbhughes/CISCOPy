@@ -1,0 +1,8 @@
+-r requirements.txt
+pytest
+codespell
+coverage
+pytest-cov
+pre-commit
+ruff
+hypothesis

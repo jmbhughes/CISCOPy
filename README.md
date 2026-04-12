@@ -7,6 +7,28 @@ CISCOPy is a Python package for CIISCO/CISCO-style analysis of solar image seque
 built from the legacy IDL implementation together with the method described by Patel et al. (2021),
 using standard scientific Python tools where possible.
 
+## Installation
+
+Standard install:
+
+```bash
+python -m pip install .
+```
+
+Install from requirements:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+Development install:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pip install -e .
+```
+
 The package accepts:
 
 - a list of FITS file paths
