@@ -47,6 +47,23 @@ class CMECandidate:
 
 
 @dataclass(slots=True)
+class CMEFitDiagnostic:
+    """Diagnostic products for a fitted CME height-time ridge."""
+
+    position_angle: float
+    width: float
+    start_time: str
+    end_time: str
+    start_index: int
+    end_index: int
+    time_seconds: np.ndarray
+    radius_rsun: np.ndarray
+    height_time: np.ndarray
+    ridge_time_seconds: np.ndarray
+    ridge_radius_rsun: np.ndarray
+
+
+@dataclass(slots=True)
 class ProcessedSequence:
     """Intermediate products from the CME pipeline."""
 
@@ -59,6 +76,18 @@ class ProcessedSequence:
     motion_filtered_cube: np.ndarray
     cadence_seconds: float
     km_per_pixel: float
+
+
+@dataclass(slots=True)
+class CMEDetectionDebug:
+    """Intermediate angle-time products used during CME region detection."""
+
+    cme_map: np.ndarray
+    work_map: np.ndarray
+    detrended_map: np.ndarray
+    threshold_map: np.ndarray
+    binary_mask: np.ndarray
+    edge_frames: int
 
 
 def _header_value(header: Any | None, key: str) -> Any:
@@ -175,6 +204,7 @@ def preprocess_sequence(
         polar, polar_angles, polar_radius_pixels = polar_transform(
             frame,
             header=sequence[0].header,
+            wcs=sequence[0].wcs,
             theta_samples=theta_samples,
             radial_samples=radial_samples,
             r_min=r_min_pix,
@@ -254,6 +284,86 @@ def _sobel_magnitude(image: np.ndarray) -> np.ndarray:
     return np.hypot(grad_time, grad_radius)
 
 
+def _wrapped_component_masks(binary: np.ndarray) -> list[np.ndarray]:
+    """Return connected components on a circular angle axis.
+
+    The angle axis is duplicated once so structures spanning the 359/0 degree
+    seam can be labeled as a single component. Equivalent duplicated labels are
+    deduplicated by their modulo-angle footprint and time footprint, keeping the
+    shortest-span representation.
+    """
+
+    n_angles, _n_times = binary.shape
+    binary_ext = np.concatenate([binary, binary], axis=0)
+    binary_ext = binary_closing(binary_ext, structure=np.ones((5, 5), dtype=bool))
+    labels_ext, count = label(binary_ext)
+    best_components: dict[tuple[tuple[int, ...], tuple[int, ...]], tuple[int, np.ndarray]] = {}
+
+    for label_id in range(1, count + 1):
+        rows, cols = np.where(labels_ext == label_id)
+        if rows.size == 0:
+            continue
+        row_key = tuple(np.unique(rows % n_angles).tolist())
+        col_key = tuple(np.unique(cols).tolist())
+        key = (row_key, col_key)
+        span = int(rows.max() - rows.min() + 1)
+        mask = labels_ext == label_id
+        existing = best_components.get(key)
+        if existing is None or span < existing[0]:
+            best_components[key] = (span, mask)
+
+    return [item[1] for item in best_components.values()]
+
+
+def compute_cme_detection_debug(
+    processed: ProcessedSequence,
+    sequence: SolarSequence,
+    *,
+    preset: str | InstrumentPreset | None = None,
+    threshold_sigma: float | None = None,
+) -> CMEDetectionDebug:
+    """Build the adaptive angle-time detection products for CME candidates.
+
+    The thresholding is adaptive in two senses:
+    1. a low-frequency angle-time background is removed from the CME map
+    2. a local robust-noise estimate defines a threshold surface instead of a
+       single scalar threshold for the entire day
+    """
+
+    resolved_preset = resolve_preset(preset, header=sequence[0].header)
+    threshold_sigma = resolved_preset.threshold_sigma if threshold_sigma is None else threshold_sigma
+
+    cme_map = np.sum(np.abs(processed.motion_filtered_cube), axis=1)
+    cme_map = gaussian_filter(cme_map, sigma=(2.0, 1.0))
+    _n_angles, n_times = cme_map.shape
+    edge_frames = min(5, max(1, n_times // 10))
+    work = cme_map[:, edge_frames : n_times - edge_frames] if n_times > edge_frames * 2 else cme_map
+
+    background = gaussian_filter(work, sigma=(12.0, 3.0))
+    detrended = work - background
+
+    local_center = gaussian_filter(detrended, sigma=(6.0, 1.5))
+    local_abs_dev = gaussian_filter(np.abs(detrended - local_center), sigma=(6.0, 1.5))
+    local_sigma = 1.4826 * local_abs_dev
+
+    median_value = float(np.median(detrended))
+    mad = float(np.median(np.abs(detrended - median_value)))
+    global_sigma = max(1.4826 * mad, np.std(detrended) / 4.0, 1.0e-6)
+    global_threshold = median_value + threshold_sigma * global_sigma
+    adaptive_threshold = threshold_sigma * np.maximum(local_sigma, 0.2 * global_sigma)
+    threshold_map = np.minimum(adaptive_threshold, global_threshold)
+    binary = detrended >= threshold_map
+
+    return CMEDetectionDebug(
+        cme_map=cme_map,
+        work_map=work,
+        detrended_map=detrended,
+        threshold_map=threshold_map,
+        binary_mask=binary,
+        edge_frames=edge_frames,
+    )
+
+
 def detect_cme_regions(
     processed: ProcessedSequence,
     sequence: SolarSequence,
@@ -264,6 +374,7 @@ def detect_cme_regions(
     min_area: int | None = None,
     min_speed_kms: float | None = None,
     max_speed_kms: float | None = None,
+    max_duration_hours: float | None = None,
 ) -> list[dict[str, Any]]:
     """Find candidate CME regions in angle-time space.
 
@@ -282,6 +393,10 @@ def detect_cme_regions(
         Minimum connected-region size in the angle-time detection mask.
     min_speed_kms, max_speed_kms
         Speed bounds used to reject unrealistically short or long events.
+    max_duration_hours
+        Maximum candidate duration allowed in the angle-time CME map. Regions
+        that persist too long are rejected as likely background structures
+        rather than transients.
 
     Returns
     -------
@@ -295,31 +410,35 @@ def detect_cme_regions(
     min_area = resolved_preset.min_area if min_area is None else min_area
     min_speed_kms = resolved_preset.min_speed_kms if min_speed_kms is None else min_speed_kms
     max_speed_kms = resolved_preset.max_speed_kms if max_speed_kms is None else max_speed_kms
+    max_duration_hours = resolved_preset.max_duration_hours if max_duration_hours is None else max_duration_hours
 
-    cme_map = np.sum(np.abs(processed.motion_filtered_cube), axis=1)
-    cme_map = gaussian_filter(cme_map, sigma=(2.0, 1.0))
-    n_angles, n_times = cme_map.shape
-    edge_frames = min(5, max(1, n_times // 10))
-    work = cme_map[:, edge_frames : n_times - edge_frames] if n_times > edge_frames * 2 else cme_map
-    detrended = work - gaussian_filter(work, sigma=(12.0, 3.0))
-    median_value = float(np.median(detrended))
-    mad = float(np.median(np.abs(detrended - median_value)))
-    robust_sigma = 1.4826 * mad
-    threshold = median_value + threshold_sigma * max(robust_sigma, np.std(detrended) / 4.0)
-    binary = detrended >= threshold
-    binary = binary_closing(binary, structure=np.ones((5, 5), dtype=bool))
-    labels, count = label(binary)
+    debug = compute_cme_detection_debug(
+        processed,
+        sequence,
+        preset=resolved_preset,
+        threshold_sigma=threshold_sigma,
+    )
+    cme_map = debug.cme_map
+    n_angles, _n_times = cme_map.shape
+    edge_frames = debug.edge_frames
+    binary = debug.binary_mask
+    wrapped_masks = _wrapped_component_masks(binary)
 
     rsun_ref_km, _ = _solar_radii_metadata(sequence)
     radial_span_km = (processed.polar_radius_rsun[-1] - processed.polar_radius_rsun[0]) * rsun_ref_km
     min_duration = int(np.ceil(radial_span_km / (max_speed_kms * processed.cadence_seconds)))
     max_duration = int(np.ceil(radial_span_km / (min_speed_kms * processed.cadence_seconds)))
+    if max_duration_hours > 0.0:
+        duration_limit = int(np.floor((max_duration_hours * 3600.0) / processed.cadence_seconds))
+        max_duration = min(max_duration, max(1, duration_limit))
 
     regions: list[dict[str, Any]] = []
-    for label_id in range(1, count + 1):
-        rows, cols = np.where(labels == label_id)
+    for component_mask in wrapped_masks:
+        rows, cols = np.where(component_mask)
         if rows.size < min_area:
             continue
+        if rows.min() >= n_angles:
+            rows = rows - n_angles
         angle_span = rows.max() - rows.min() + 1
         time_span = cols.max() - cols.min() + 1
         if angle_span < min_width_deg or time_span < min_duration or time_span > max_duration:
@@ -329,18 +448,21 @@ def detect_cme_regions(
         end_time_index = edge_frames + int(cols.max())
         angle_start = int(rows.min())
         angle_stop = int(rows.max())
+        angle_indices = np.arange(angle_start, angle_stop + 1, dtype=int) % n_angles
         aggregated_ht = np.sum(
-            np.abs(processed.motion_filtered_cube[angle_start : angle_stop + 1, :, start_time_index : end_time_index + 1]),
+            np.abs(processed.motion_filtered_cube[angle_indices, :, start_time_index : end_time_index + 1]),
             axis=0,
         ).T
+        angle_step = 360.0 / n_angles
+        center_index = int(round((angle_start + angle_stop) / 2.0)) % n_angles
         regions.append(
             {
                 "start_index": start_time_index,
                 "end_index": end_time_index,
-                "angle_start": angle_start,
-                "angle_stop": angle_stop,
-                "position_angle": float((angle_start + angle_stop) / 2.0),
-                "width": float(angle_span),
+                "angle_start": angle_start % n_angles,
+                "angle_stop": angle_stop % n_angles,
+                "position_angle": float(processed.polar_angles_deg[center_index]),
+                "width": float(angle_span * angle_step),
                 "height_time": aggregated_ht,
             }
         )
@@ -399,6 +521,53 @@ def _cached_hough_lookup(radial_len: int) -> tuple[np.ndarray, np.ndarray]:
     return aval, root_lookup
 
 
+def _best_parabolic_candidate(
+    height_time: np.ndarray,
+    *,
+    cadence_seconds: float,
+    km_per_pixel: float,
+    min_votes: int,
+) -> tuple[np.ndarray, np.ndarray, tuple[int, int] | None]:
+    accumulator, candidates = _parabolic_hough_candidates(
+        height_time,
+        cadence_seconds=cadence_seconds,
+        km_per_pixel=km_per_pixel,
+        min_votes=min_votes,
+    )
+    if candidates.size == 0:
+        return accumulator, candidates, None
+
+    scores = np.asarray([accumulator[t0_index, a_index] for t0_index, a_index in candidates], dtype=float)
+    best_index = int(np.argmax(scores))
+    return accumulator, candidates, tuple(int(value) for value in candidates[best_index])
+
+
+def _ridge_from_hough_peak(
+    height_time: np.ndarray,
+    *,
+    best_peak: tuple[int, int],
+    cadence_seconds: float,
+    radial_len: int,
+    km_per_pixel: float,
+    r_min_rsun: float,
+    r_max_rsun: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    t0_index, a_index = best_peak
+    aval, _root_lookup = _cached_hough_lookup(radial_len)
+    a_param = float(aval[a_index])
+    times = np.arange(height_time.shape[0], dtype=float)
+    radii = a_param * (times - t0_index) ** 2
+    valid = (radii >= 0.0) & (radii < radial_len) & (times >= float(t0_index))
+    if np.count_nonzero(valid) == 0:
+        return np.empty(0, dtype=float), np.empty(0, dtype=float)
+
+    ridge_time_seconds = times[valid] * cadence_seconds
+    radius_rsun = np.linspace(r_min_rsun, r_max_rsun, radial_len)
+    ridge_radius_rsun = np.interp(radii[valid], np.arange(radial_len, dtype=float), radius_rsun)
+    _ = km_per_pixel
+    return ridge_time_seconds, ridge_radius_rsun
+
+
 def characterize_region(
     region: dict[str, Any],
     processed: ProcessedSequence,
@@ -425,7 +594,7 @@ def characterize_region(
     """
 
     resolved_preset = resolve_preset(preset, header=sequence[0].header)
-    accumulator, candidates = _parabolic_hough_candidates(
+    accumulator, candidates, _best_peak = _best_parabolic_candidate(
         region["height_time"],
         cadence_seconds=processed.cadence_seconds,
         km_per_pixel=processed.km_per_pixel,
@@ -480,6 +649,84 @@ def characterize_region(
     )
 
 
+def build_candidate_diagnostic(
+    sequence: SolarSequence,
+    processed: ProcessedSequence,
+    *,
+    preset: str | InstrumentPreset | None = None,
+    candidate_index: int = 0,
+) -> CMEFitDiagnostic:
+    """Build a height-time diagnostic product for one detected CME candidate.
+
+    Parameters
+    ----------
+    sequence
+        Original normalized solar image sequence.
+    processed
+        Preprocessed intermediate products for the same sequence.
+    preset
+        Optional preset used to configure the Hough threshold.
+    candidate_index
+        Index of the detected CME region to diagnose.
+
+    Returns
+    -------
+    CMEFitDiagnostic
+        Height-time map together with the best-fit ridge in solar-radius units.
+    """
+
+    resolved_preset = resolve_preset(preset, header=sequence[0].header)
+    regions = detect_cme_regions(processed, sequence, preset=resolved_preset)
+    if not regions:
+        raise ValueError("No CME candidate regions were detected, so no height-time diagnostic can be built.")
+    if candidate_index < 0 or candidate_index >= len(regions):
+        raise IndexError(f"candidate_index {candidate_index} is out of range for {len(regions)} detected candidates.")
+
+    region = regions[candidate_index]
+    height_time = region["height_time"]
+    time_len, radial_len = height_time.shape
+    _accumulator, _candidates, best_peak = _best_parabolic_candidate(
+        height_time,
+        cadence_seconds=processed.cadence_seconds,
+        km_per_pixel=processed.km_per_pixel,
+        min_votes=resolved_preset.hough_min_votes,
+    )
+    if best_peak is None:
+        raise ValueError("A CME region was detected, but the parabolic Hough fit did not find a usable ridge.")
+
+    ridge_time_seconds, ridge_radius_rsun = _ridge_from_hough_peak(
+        height_time,
+        best_peak=best_peak,
+        cadence_seconds=processed.cadence_seconds,
+        radial_len=radial_len,
+        km_per_pixel=processed.km_per_pixel,
+        r_min_rsun=float(processed.polar_radius_rsun[0]),
+        r_max_rsun=float(processed.polar_radius_rsun[-1]),
+    )
+
+    start_frame = sequence[min(region["start_index"], len(sequence) - 1)]
+    start_time = start_frame.time.isot if start_frame.time is not None else f"frame-{region['start_index']:04d}"
+    time_seconds = np.arange(time_len, dtype=float) * processed.cadence_seconds
+    ridge_end_offset = int(round(float(ridge_time_seconds[-1]) / processed.cadence_seconds)) if ridge_time_seconds.size else 0
+    end_index = min(region["start_index"] + ridge_end_offset, len(sequence) - 1)
+    end_frame = sequence[end_index]
+    end_time = end_frame.time.isot if end_frame.time is not None else f"frame-{end_index:04d}"
+
+    return CMEFitDiagnostic(
+        position_angle=float(region["position_angle"]),
+        width=float(region["width"]),
+        start_time=start_time,
+        end_time=end_time,
+        start_index=int(region["start_index"]),
+        end_index=end_index,
+        time_seconds=time_seconds,
+        radius_rsun=processed.polar_radius_rsun.copy(),
+        height_time=height_time.copy(),
+        ridge_time_seconds=ridge_time_seconds,
+        ridge_radius_rsun=ridge_radius_rsun,
+    )
+
+
 def characterize_cmes(
     sequence: SolarSequence,
     *,
@@ -488,6 +735,9 @@ def characterize_cmes(
     r_max_rsun: float | None = None,
     theta_samples: int | None = None,
     radial_samples: int | None = None,
+    reduce_resolution: bool = True,
+    downsample_factor: int | None = None,
+    target_max_dim: int = 512,
 ) -> tuple[list[CMECandidate], ProcessedSequence]:
     """Run the full CIISCO-style pipeline and return detected CME properties.
 
@@ -501,13 +751,16 @@ def characterize_cmes(
         Number of angular bins in the polar transform.
     radial_samples
         Number of radial bins in the polar transform.
-
+    reduce_resolution, downsample_factor, target_max_dim
+        Accepted for API compatibility. Any downsampling should already happen
+        during FITS loading before characterization is called.
     Returns
     -------
     tuple[list[CMECandidate], ProcessedSequence]
         Detected CME candidates and the associated intermediate products.
     """
 
+    _ = (reduce_resolution, downsample_factor, target_max_dim)
     _validate_sequence_for_kinematics(sequence)
     processed = preprocess_sequence(
         sequence,

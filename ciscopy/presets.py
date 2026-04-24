@@ -22,6 +22,7 @@ class InstrumentPreset:
     min_area: int = 50
     min_speed_kms: float = 100.0
     max_speed_kms: float = 2000.0
+    max_duration_hours: float = 8.0
     hough_min_votes: int = 8
 
 
@@ -29,8 +30,28 @@ PRESETS: dict[str, InstrumentPreset] = {
     "generic": InstrumentPreset("generic"),
     "aia171": InstrumentPreset("aia171", radial_samples=256, threshold_sigma=3.5, min_area=45),
     "aia304": InstrumentPreset("aia304", radial_samples=256, threshold_sigma=3.0, min_area=40),
-    "fsi174": InstrumentPreset("fsi174", r_min_rsun=1.0, r_max_rsun=4.0, radial_samples=224, threshold_sigma=3.25, min_area=35),
-    "fsi304": InstrumentPreset("fsi304", r_min_rsun=1.0, r_max_rsun=4.0, radial_samples=224, threshold_sigma=3.0, min_area=35),
+    "fsi174": InstrumentPreset(
+        "fsi174",
+        r_min_rsun=1.0,
+        r_max_rsun=4.0,
+        radial_samples=224,
+        threshold_sigma=1.4,
+        min_width_deg=6,
+        min_area=12,
+        min_speed_kms=50.0,
+        max_speed_kms=2500.0,
+    ),
+    "fsi304": InstrumentPreset(
+        "fsi304",
+        r_min_rsun=1.0,
+        r_max_rsun=4.0,
+        radial_samples=224,
+        threshold_sigma=2.2,
+        min_width_deg=6,
+        min_area=10,
+        min_speed_kms=50.0,
+        max_speed_kms=2500.0,
+    ),
     "swap174": InstrumentPreset("swap174", radial_samples=192, threshold_sigma=3.25, min_area=35),
     "euvi304": InstrumentPreset("euvi304", radial_samples=192, threshold_sigma=3.0, min_area=35),
     "lasco_c2": InstrumentPreset("lasco_c2", r_min_rsun=2.0, r_max_rsun=6.0, radial_samples=256, threshold_sigma=3.5, min_area=45),

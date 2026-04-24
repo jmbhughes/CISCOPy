@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
+from math import ceil
 from pathlib import Path
 from typing import Any
 from typing import Mapping
 
 import numpy as np
+from ciscopy.sunpy_compat import prepare_legacy_solar_header
 
 try:
     from astropy.io.fits import Header
@@ -70,7 +73,7 @@ class SolarFrame:
         except ModuleNotFoundError as exc:  # pragma: no cover
             msg = "sunpy is required to convert SolarFrame to a SunPy map."
             raise ModuleNotFoundError(msg) from exc
-        return sunpy.map.Map(self.data, self.header)
+        return sunpy.map.Map(self.data, prepare_legacy_solar_header(self.header))
 
 
 @dataclass(slots=True)
@@ -127,3 +130,59 @@ class SolarSequence:
         """Convert each frame to `ndcube.NDCube`."""
 
         return [frame.to_ndcube() for frame in self.frames]
+
+
+def downsample_sequence(
+    sequence: SolarSequence,
+    *,
+    factor: int | None = None,
+    target_max_dim: int = 512,
+) -> SolarSequence:
+    """Downsample a sequence spatially for faster large-scale CME analysis."""
+
+    if factor is None:
+        factor = max(1, ceil(max(sequence[0].shape) / target_max_dim))
+    if factor <= 1:
+        return sequence
+
+    frames = [_downsample_frame(frame, factor) for frame in sequence]
+    return SolarSequence(frames)
+
+
+def _downsample_frame(frame: SolarFrame, factor: int) -> SolarFrame:
+    data = frame.data[::factor, ::factor]
+    header = _downsample_header(frame.header, factor)
+    return SolarFrame(
+        data=data,
+        header=header,
+        wcs=None,
+        meta=dict(frame.meta),
+        unit=frame.unit,
+        source=frame.source,
+        time=frame.time,
+    )
+
+
+def _downsample_header(header: Header | None, factor: int) -> Header | None:
+    if header is None:
+        return None
+
+    scaled = deepcopy(header)
+    for key in ("CRPIX1", "CRPIX2", "EUXCEN", "EUYCEN"):
+        if key in scaled:
+            scaled[key] = (float(scaled[key]) - 0.5) / factor + 0.5
+
+    for key in ("CDELT1", "CDELT2"):
+        if key in scaled:
+            scaled[key] = float(scaled[key]) * factor
+
+    if "NAXIS1" in scaled:
+        scaled["NAXIS1"] = max(1, int(ceil(int(scaled["NAXIS1"]) / factor)))
+    if "NAXIS2" in scaled:
+        scaled["NAXIS2"] = max(1, int(ceil(int(scaled["NAXIS2"]) / factor)))
+    if "ZNAXIS1" in scaled:
+        scaled["ZNAXIS1"] = max(1, int(ceil(int(scaled["ZNAXIS1"]) / factor)))
+    if "ZNAXIS2" in scaled:
+        scaled["ZNAXIS2"] = max(1, int(ceil(int(scaled["ZNAXIS2"]) / factor)))
+
+    return scaled

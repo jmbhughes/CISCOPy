@@ -12,6 +12,8 @@ import numpy as np
 
 from ciscopy.sequence import SolarFrame
 from ciscopy.sequence import SolarSequence
+from ciscopy.sequence import _downsample_header
+from ciscopy.sunpy_compat import prepare_legacy_solar_header
 
 try:
     from astropy.io import fits
@@ -84,7 +86,9 @@ def _normalize_header_wcs(
 def load_fits_sequence(
     paths: Sequence[PathLike],
     *,
-    ext: int | str = 0,
+    ext: int | str | None = None,
+    downsample_factor: int | None = None,
+    target_max_dim: int | None = None,
 ) -> SolarSequence:
     """Load a sequence of FITS images into a normalized `SolarSequence`.
 
@@ -93,7 +97,15 @@ def load_fits_sequence(
     paths
         Ordered collection of FITS file paths.
     ext
-        FITS extension index or name containing the image data.
+        FITS extension index or name containing the image data. When omitted,
+        the loader first checks the primary HDU and then falls back to the
+        first extension containing a 2D image.
+    downsample_factor
+        Optional integer stride used to downsample large FITS images while
+        loading them.
+    target_max_dim
+        Optional maximum image dimension used to infer a loading-time
+        downsampling factor when `downsample_factor` is not given.
 
     Returns
     -------
@@ -104,24 +116,68 @@ def load_fits_sequence(
 
     _require_astropy("FITS loading")
     frames: list[SolarFrame] = []
+    resolved_factor = downsample_factor
     for path in paths:
         with fits.open(path) as hdul:
-            image = np.asarray(hdul[ext].data, dtype=float)
+            selected_ext = _select_image_hdu(hdul, ext)
+            if resolved_factor is None and target_max_dim is not None:
+                resolved_factor = _infer_loader_downsample_factor(hdul[selected_ext], target_max_dim)
+            image = np.asarray(hdul[selected_ext].data, dtype=float)
             if image.ndim != 2:
                 msg = f"Expected 2D FITS image in {path!s}, got shape {image.shape!r}."
                 raise ValueError(msg)
-            header = hdul[ext].header.copy()
+            header = prepare_legacy_solar_header(hdul[selected_ext].header)
+            if resolved_factor is not None and resolved_factor > 1:
+                image = image[::resolved_factor, ::resolved_factor]
+                header = _downsample_header(header, resolved_factor)
             frames.append(
                 SolarFrame(
                     data=image,
                     header=header,
-                    wcs=WCS(header),
-                    meta={"path": str(path)},
+                    wcs=_wcs_from_header(header),
+                    meta={"path": str(path), "fits_ext": selected_ext},
                     source=path,
                     time=_time_from_header(header),
                 )
             )
     return SolarSequence(frames)
+
+
+def _infer_loader_downsample_factor(hdu: Any, target_max_dim: int) -> int:
+    if target_max_dim <= 0:
+        raise ValueError("target_max_dim must be positive.")
+
+    header = getattr(hdu, "header", None)
+    naxis1 = None if header is None else header.get("NAXIS1")
+    naxis2 = None if header is None else header.get("NAXIS2")
+    if naxis1 is None or naxis2 is None:
+        data = getattr(hdu, "data", None)
+        if data is None:
+            return 1
+        shape = np.asarray(data).shape
+        if len(shape) < 2:
+            return 1
+        naxis2, naxis1 = shape[-2], shape[-1]
+
+    max_dim = max(int(naxis1), int(naxis2))
+    return max(1, int(np.ceil(max_dim / target_max_dim)))
+
+
+def _select_image_hdu(hdul: Any, ext: int | str | None) -> int | str:
+    if ext is not None:
+        return ext
+
+    primary_data = getattr(hdul[0], "data", None)
+    if primary_data is not None and np.asarray(primary_data).ndim == 2:
+        return 0
+
+    for index, hdu in enumerate(hdul[1:], start=1):
+        data = getattr(hdu, "data", None)
+        if data is not None and np.asarray(data).ndim == 2:
+            return index
+
+    msg = "No 2D image HDU was found in the FITS file."
+    raise ValueError(msg)
 
 
 def _frames_from_ndcube_list(data: Sequence[Any]) -> SolarSequence:
@@ -205,6 +261,9 @@ def normalize_input(
     meta: dict[str, Any] | Sequence[dict[str, Any] | None] | None = None,
     unit: Any | None = None,
     time: Any | Sequence[Any] | None = None,
+    ext: int | str | None = None,
+    downsample_factor: int | None = None,
+    target_max_dim: int | None = None,
 ) -> SolarSequence:
     """Normalize supported user inputs to a single `SolarSequence`.
 
@@ -215,6 +274,14 @@ def normalize_input(
         `NDCube` objects.
     header, wcs, meta, unit, time
         Optional per-input metadata used primarily for NumPy-array inputs.
+    ext
+        Optional FITS extension to use when `data` is provided as FITS paths.
+    downsample_factor
+        Optional integer stride used to downsample FITS path inputs during
+        loading.
+    target_max_dim
+        Optional maximum image dimension used to derive an adaptive FITS
+        loading downsampling factor.
 
     Returns
     -------
@@ -223,7 +290,12 @@ def normalize_input(
     """
 
     if _is_pathlike_list(data):
-        return load_fits_sequence(data)
+        return load_fits_sequence(
+            data,
+            ext=ext,
+            downsample_factor=downsample_factor,
+            target_max_dim=target_max_dim,
+        )
 
     if _looks_like_ndcube(data):
         return _frames_from_ndcube_list([data])
@@ -237,7 +309,12 @@ def normalize_input(
     if isinstance(data, Iterable) and not isinstance(data, (str, bytes, dict)):
         as_list = list(data)
         if _is_pathlike_list(as_list):
-            return load_fits_sequence(as_list)
+            return load_fits_sequence(
+                as_list,
+                ext=ext,
+                downsample_factor=downsample_factor,
+                target_max_dim=target_max_dim,
+            )
         if as_list and all(_looks_like_ndcube(item) for item in as_list):
             return _frames_from_ndcube_list(as_list)
 

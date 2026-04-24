@@ -28,6 +28,7 @@ class CISCO:
         meta: dict[str, Any] | list[dict[str, Any] | None] | None = None,
         unit: Any | None = None,
         time: Any | list[Any] | None = None,
+        ext: int | str | None = None,
     ) -> "CISCO":
         """Build a pipeline object from supported image-sequence inputs.
 
@@ -40,9 +41,12 @@ class CISCO:
         header, wcs, meta, unit, time
             Optional metadata used when `data` is provided as arrays rather than
             FITS files or `NDCube` objects.
+        ext
+            Optional FITS extension to use when `data` is a FITS path list. When
+            omitted, the loader auto-detects the first 2D image HDU.
         """
 
-        return cls(normalize_input(data, header=header, wcs=wcs, meta=meta, unit=unit, time=time))
+        return cls(normalize_input(data, header=header, wcs=wcs, meta=meta, unit=unit, time=time, ext=ext))
 
     def as_cube(self):
         """Return the normalized time-ordered image cube."""
@@ -57,6 +61,9 @@ class CISCO:
         r_max_rsun: float | None = None,
         theta_samples: int | None = None,
         radial_samples: int | None = None,
+        reduce_resolution: bool = True,
+        downsample_factor: int | None = None,
+        target_max_dim: int = 512,
     ):
         """Run the end-to-end CME characterization pipeline.
 
@@ -68,6 +75,14 @@ class CISCO:
             Number of angular samples in the polar representation.
         radial_samples
             Number of radial bins in the polar representation.
+        reduce_resolution
+            Whether to downsample large images before processing. Enabled by
+            default for faster detection of large-scale structures.
+        downsample_factor
+            Optional explicit integer downsampling factor.
+        target_max_dim
+            Maximum image dimension targeted by the default adaptive
+            downsampling.
 
         Returns
         -------
@@ -84,5 +99,8 @@ class CISCO:
             r_max_rsun=r_max_rsun,
             theta_samples=theta_samples,
             radial_samples=radial_samples,
+            reduce_resolution=reduce_resolution,
+            downsample_factor=downsample_factor,
+            target_max_dim=target_max_dim,
         )
         return candidates_to_table(candidates), processed

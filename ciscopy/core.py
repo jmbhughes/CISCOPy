@@ -8,8 +8,10 @@ from typing import Any
 
 from astropy.table import Table
 
+from ciscopy.io import _is_pathlike_list
 from ciscopy.cme import ProcessedSequence
 from ciscopy.io import normalize_input
+from ciscopy.movie import write_cme_movie
 from ciscopy.pipeline import CISCO
 from ciscopy.presets import InstrumentPreset
 
@@ -64,13 +66,20 @@ def main(
     meta: dict[str, Any] | list[dict[str, Any] | None] | None = None,
     unit: Any | None = None,
     time: Any | list[Any] | None = None,
+    ext: int | str | None = None,
     preset: str | InstrumentPreset | None = None,
     r_min_rsun: float | None = None,
     r_max_rsun: float | None = None,
     theta_samples: int | None = None,
     radial_samples: int | None = None,
+    reduce_resolution: bool = True,
+    downsample_factor: int | None = None,
+    target_max_dim: int = 512,
     output_path: str | Path | None = None,
     output_format: str | None = None,
+    make_movie: bool = False,
+    movie_output_path: str | Path | None = None,
+    movie_candidate_index: int = 0,
     overwrite: bool = True,
 ) -> CISCOResult:
     """Run the end-to-end CISCOPy pipeline from flexible inputs.
@@ -91,6 +100,9 @@ def main(
         Optional data unit for array or `NDCube` inputs.
     time
         Optional observation time or per-frame times for array inputs.
+    ext
+        Optional FITS extension to use when `data` is a FITS path list. When
+        omitted, the loader auto-detects the first 2D image HDU.
     preset
         Optional instrument preset name or preset object. When omitted, the
         package attempts to infer a preset from FITS metadata and otherwise
@@ -109,12 +121,28 @@ def main(
     radial_samples
         Number of radial bins in the polar transform. When omitted, the preset
         default is used.
+    reduce_resolution
+        Whether to downsample large images before running the pipeline. This is
+        enabled by default because the algorithm targets large-scale CME
+        structures.
+    downsample_factor
+        Optional explicit integer spatial downsampling factor.
+    target_max_dim
+        Maximum image dimension targeted by the default adaptive downsampling.
     output_path
         Optional output file path. When provided, the result table is also
         written to disk.
     output_format
         Optional Astropy ASCII writer format. If omitted, the format is inferred
         from the output filename.
+    make_movie
+        When `True`, also render a compact MP4 movie for one detected CME
+        candidate.
+    movie_output_path
+        Optional output path for the MP4 movie. Required when
+        `make_movie=True`.
+    movie_candidate_index
+        Which detected candidate to visualize in the movie output.
     overwrite
         Whether to overwrite an existing output file.
 
@@ -124,7 +152,19 @@ def main(
         A container with the final Astropy table and intermediate products.
     """
 
-    sequence = normalize_input(data, header=header, wcs=wcs, meta=meta, unit=unit, time=time)
+    fitspath_input = _is_pathlike_list(data)
+    preload_downsample = reduce_resolution and fitspath_input
+    sequence = normalize_input(
+        data,
+        header=header,
+        wcs=wcs,
+        meta=meta,
+        unit=unit,
+        time=time,
+        ext=ext,
+        downsample_factor=downsample_factor if preload_downsample else None,
+        target_max_dim=target_max_dim if preload_downsample and downsample_factor is None else None,
+    )
     pipeline = CISCO(sequence)
     table, processed = pipeline.characterize(
         preset=preset,
@@ -132,10 +172,24 @@ def main(
         r_max_rsun=r_max_rsun,
         theta_samples=theta_samples,
         radial_samples=radial_samples,
+        reduce_resolution=False if preload_downsample else reduce_resolution,
+        downsample_factor=downsample_factor,
+        target_max_dim=target_max_dim,
     )
 
     if output_path is not None:
         write_table(table, output_path, format=output_format, overwrite=overwrite)
+
+    if make_movie:
+        if movie_output_path is None:
+            raise ValueError("movie_output_path is required when make_movie=True.")
+        write_cme_movie(
+            sequence,
+            processed,
+            movie_output_path,
+            preset=preset,
+            candidate_index=movie_candidate_index,
+        )
 
     return CISCOResult(table=table, processed=processed)
 
