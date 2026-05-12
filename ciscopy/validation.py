@@ -102,6 +102,6 @@ def summarize_reference_coverage() -> dict[str, Any]:
     instruments = np.asarray(table["instrument"])
     unique, counts = np.unique(instruments, return_counts=True)
     return {
-        "event_count": int(len(table)),
+        "event_count": len(table),
         "instruments": {instrument: int(count) for instrument, count in zip(unique.tolist(), counts.tolist(), strict=True)},
     }

@@ -1,31 +1,24 @@
 """CISCOPy public package API."""
 
-from ciscopy.background import azimuthal_radial_intensity
-from ciscopy.background import minimum_background
-from ciscopy.background import uniform_background
-from ciscopy.cme import CMECandidate
-from ciscopy.cme import CMEFitDiagnostic
-from ciscopy.cme import candidates_to_table
-from ciscopy.cme import characterize_cmes
-from ciscopy.cme import detect_cme_regions
-from ciscopy.cme import fourier_motion_filter
-from ciscopy.cme import preprocess_sequence
-from ciscopy.core import CISCOResult
-from ciscopy.core import main
-from ciscopy.core import write_table
+from ciscopy.background import azimuthal_radial_intensity, minimum_background, uniform_background
+from ciscopy.cme import (
+    CMECandidate,
+    CMEFitDiagnostic,
+    candidates_to_table,
+    characterize_cmes,
+    detect_cme_regions,
+    fourier_motion_filter,
+    preprocess_sequence,
+)
+from ciscopy.core import CISCOResult, main, write_table
 from ciscopy.diagnostics import write_height_time_map_svg
-from ciscopy.movie import write_cme_movie
 from ciscopy.geometry import mask_disk, polar_transform
 from ciscopy.io import load_fits_sequence, normalize_input
+from ciscopy.movie import write_cme_movie
 from ciscopy.pipeline import CISCO
-from ciscopy.presets import InstrumentPreset
-from ciscopy.presets import get_instrument_preset
-from ciscopy.presets import infer_instrument_preset
-from ciscopy.presets import resolve_preset
+from ciscopy.presets import InstrumentPreset, get_instrument_preset, infer_instrument_preset, resolve_preset
 from ciscopy.sequence import SolarFrame, SolarSequence, downsample_sequence
-from ciscopy.validation import filter_reference_events
-from ciscopy.validation import patel_2021_reference_table
-from ciscopy.validation import summarize_reference_coverage
+from ciscopy.validation import filter_reference_events, patel_2021_reference_table, summarize_reference_coverage
 
 __all__ = [
     "CISCO",
@@ -40,6 +33,7 @@ __all__ = [
     "characterize_cmes",
     "detect_cme_regions",
     "downsample_sequence",
+    "filter_reference_events",
     "fourier_motion_filter",
     "get_instrument_preset",
     "infer_instrument_preset",
@@ -52,10 +46,9 @@ __all__ = [
     "polar_transform",
     "preprocess_sequence",
     "resolve_preset",
-    "filter_reference_events",
     "summarize_reference_coverage",
     "uniform_background",
-    "write_table",
-    "write_height_time_map_svg",
     "write_cme_movie",
+    "write_height_time_map_svg",
+    "write_table",
 ]

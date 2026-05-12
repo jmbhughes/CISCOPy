@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from collections.abc import Sequence
+import warnings
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
-import warnings
 
 import numpy as np
 
-from ciscopy.sequence import SolarFrame
-from ciscopy.sequence import SolarSequence
-from ciscopy.sequence import _downsample_header
+from ciscopy.sequence import SolarFrame, SolarSequence, _downsample_header
 from ciscopy.sunpy_compat import prepare_legacy_solar_header
 
 try:

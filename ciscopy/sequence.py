@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from math import ceil
 from pathlib import Path
 from typing import Any
-from typing import Mapping
 
 import numpy as np
+
 from ciscopy.sunpy_compat import prepare_legacy_solar_header
 
 try:
@@ -177,12 +178,12 @@ def _downsample_header(header: Header | None, factor: int) -> Header | None:
             scaled[key] = float(scaled[key]) * factor
 
     if "NAXIS1" in scaled:
-        scaled["NAXIS1"] = max(1, int(ceil(int(scaled["NAXIS1"]) / factor)))
+        scaled["NAXIS1"] = max(1, ceil(int(scaled["NAXIS1"]) / factor))
     if "NAXIS2" in scaled:
-        scaled["NAXIS2"] = max(1, int(ceil(int(scaled["NAXIS2"]) / factor)))
+        scaled["NAXIS2"] = max(1, ceil(int(scaled["NAXIS2"]) / factor))
     if "ZNAXIS1" in scaled:
-        scaled["ZNAXIS1"] = max(1, int(ceil(int(scaled["ZNAXIS1"]) / factor)))
+        scaled["ZNAXIS1"] = max(1, ceil(int(scaled["ZNAXIS1"]) / factor))
     if "ZNAXIS2" in scaled:
-        scaled["ZNAXIS2"] = max(1, int(ceil(int(scaled["ZNAXIS2"]) / factor)))
+        scaled["ZNAXIS2"] = max(1, ceil(int(scaled["ZNAXIS2"]) / factor))
 
     return scaled

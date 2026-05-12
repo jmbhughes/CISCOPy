@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import warnings
 from functools import lru_cache
 from typing import Any
-import warnings
 
 import numpy as np
 from scipy.ndimage import map_coordinates

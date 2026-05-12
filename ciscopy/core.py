@@ -8,9 +8,8 @@ from typing import Any
 
 from astropy.table import Table
 
-from ciscopy.io import _is_pathlike_list
 from ciscopy.cme import ProcessedSequence
-from ciscopy.io import normalize_input
+from ciscopy.io import _is_pathlike_list, normalize_input
 from ciscopy.movie import write_cme_movie
 from ciscopy.pipeline import CISCO
 from ciscopy.presets import InstrumentPreset

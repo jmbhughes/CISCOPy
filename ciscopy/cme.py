@@ -7,19 +7,11 @@ from functools import lru_cache
 from typing import Any
 
 import numpy as np
-from scipy.ndimage import binary_closing
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import label
-from scipy.ndimage import median_filter
-from scipy.ndimage import sobel
+from scipy.ndimage import binary_closing, gaussian_filter, label, median_filter, sobel
 
-from ciscopy.background import azimuthal_radial_intensity
-from ciscopy.background import minimum_background
-from ciscopy.background import uniform_background
-from ciscopy.geometry import mask_disk
-from ciscopy.geometry import polar_transform
-from ciscopy.presets import InstrumentPreset
-from ciscopy.presets import resolve_preset
+from ciscopy.background import azimuthal_radial_intensity, minimum_background, uniform_background
+from ciscopy.geometry import mask_disk, polar_transform
+from ciscopy.presets import InstrumentPreset, resolve_preset
 from ciscopy.sequence import SolarSequence
 
 try:
@@ -454,7 +446,7 @@ def detect_cme_regions(
             axis=0,
         ).T
         angle_step = 360.0 / n_angles
-        center_index = int(round((angle_start + angle_stop) / 2.0)) % n_angles
+        center_index = round((angle_start + angle_stop) / 2.0) % n_angles
         regions.append(
             {
                 "start_index": start_time_index,
@@ -480,7 +472,6 @@ def _parabolic_hough_candidates(
     threshold = np.mean(edges) + 1.75 * np.std(edges)
     binary = edges > threshold
     time_len, radial_len = binary.shape
-    y0 = 0.0
     aval, root_lookup = _cached_hough_lookup(radial_len)
     accumulator = np.zeros((time_len, aval.size), dtype=int)
     points = np.argwhere(binary)
@@ -707,7 +698,7 @@ def build_candidate_diagnostic(
     start_frame = sequence[min(region["start_index"], len(sequence) - 1)]
     start_time = start_frame.time.isot if start_frame.time is not None else f"frame-{region['start_index']:04d}"
     time_seconds = np.arange(time_len, dtype=float) * processed.cadence_seconds
-    ridge_end_offset = int(round(float(ridge_time_seconds[-1]) / processed.cadence_seconds)) if ridge_time_seconds.size else 0
+    ridge_end_offset = round(float(ridge_time_seconds[-1]) / processed.cadence_seconds) if ridge_time_seconds.size else 0
     end_index = min(region["start_index"] + ridge_end_offset, len(sequence) - 1)
     end_frame = sequence[end_index]
     end_time = end_frame.time.isot if end_frame.time is not None else f"frame-{end_index:04d}"

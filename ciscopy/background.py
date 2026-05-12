@@ -7,8 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from ciscopy.geometry import infer_center
-from ciscopy.geometry import radial_coordinate_grid
+from ciscopy.geometry import infer_center, radial_coordinate_grid
 
 
 def azimuthal_radial_intensity(

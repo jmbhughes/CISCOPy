@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ciscopy.cme import candidates_to_table
-from ciscopy.cme import characterize_cmes
+from ciscopy.cme import candidates_to_table, characterize_cmes
 from ciscopy.io import normalize_input
 from ciscopy.presets import InstrumentPreset
 from ciscopy.sequence import SolarSequence
@@ -29,7 +28,7 @@ class CISCO:
         unit: Any | None = None,
         time: Any | list[Any] | None = None,
         ext: int | str | None = None,
-    ) -> "CISCO":
+    ) -> CISCO:
         """Build a pipeline object from supported image-sequence inputs.
 
         Parameters
