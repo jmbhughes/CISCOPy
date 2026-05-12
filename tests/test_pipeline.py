@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import numpy as np
 import pytest
 
@@ -353,6 +354,9 @@ def test_write_height_time_map_svg_outputs_overlay_plot(tmp_path) -> None:
 
 
 def test_write_cme_movie_outputs_mp4(tmp_path) -> None:
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg is not installed on this runner.")
+
     cube, headers = _synthetic_cme_cube(frame_count=40)
     sequence = normalize_input(cube, header=headers)
     processed = preprocess_sequence(sequence, r_min_rsun=1.2, r_max_rsun=3.0, radial_samples=96)
