@@ -6,7 +6,16 @@ requires = ["setuptools",
 [project]
 name = "ciscopy"
 version = "0.0.1"
-dependencies = [ ]
+dependencies = [
+  "numpy>=1.26",
+  "astropy>=6.0",
+  "ndcube>=2.2",
+  "scipy>=1.12",
+  "sunpy>=7.0",
+  "matplotlib>=3.8",
+  "mpl-animators>=1.2.0",
+  "reproject>=0.13",
+]
 requires-python = ">=3.11"
 authors = [
     {name = "J. Marcus Hughes", email = "marcus.hughes@swri.org"}
@@ -14,13 +23,20 @@ authors = [
 maintainers = [
   {name = "J. Marcus Hughes", email = "marcus.hughes@swri.org"}
 ]
-description = "CIISCO in Python with generalizations to new data."
-readme = "TODO"
-license = {file = "TODO"}
-keywords = ["TODO"]
+description = "Python tools for CIISCO/CISCO analysis on solar image sequences."
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["solar physics", "corona", "cme", "fits", "ndcube"]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "Programming Language :: Python"
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Astronomy",
 ]
 
 [project.optional-dependencies]
@@ -42,11 +58,9 @@ docs = ["sphinx",
 dev = ["ciscopy[docs,test]"]
 
 [project.urls]
-#Homepage = "https://example.com"
-#Documentation = "https://readthedocs.org"
+Homepage = "https://github.com/jmbhughes/CISCOPy"
 Repository = "https://github.com/jmbhughes/CISCOPy"
 "Bug Tracker" = "https://github.com/jmbhughes/CISCOPy/issues"
-#Changelog = "https://github.com/punch-mission/thuban/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages]
 find = {}  # Scan the project directory with the default parameters
@@ -58,8 +72,8 @@ skip = "*.fts,*.fits,venv,*.pro,*.asdf,*.ipynb"
 target-version = 'py311'
 exclude = ['tests', 'scripts', 'docs']
 line-length=120
-lint.select = ["ALL"]
-lint.ignore = [ ]
+lint.select = ["E", "F", "I", "RUF", "UP"]
+lint.ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
